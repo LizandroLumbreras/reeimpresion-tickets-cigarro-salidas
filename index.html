@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reimpresión de Tickets - Salidas Cigarro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    input, button {
+      display: block;
+      width: 100%;
+      max-width: 400px;
+      margin: 10px auto;
+      padding: 12px;
+      font-size: 16px;
+    }
+    .ticket {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: 20px auto;
+      display: none;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      .ticket, .ticket * {
+        visibility: visible;
+      }
+      .ticket {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h2 style="text-align: center;">Reimpresión de Ticket - Salidas Cigarro</h2>
+
+<input type="text" id="folioInput" placeholder="Ingresa folio (ej: SC-00001)">
+<button id="buscarBtn" style="background:#007bff; color:white;">🔁 Reimprimir Ticket</button>
+
+<div id="ticketSalida" class="ticket"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+  authDomain: "inventariopv-643f1.firebaseapp.com",
+  projectId: "inventariopv-643f1",
+  storageBucket: "inventariopv-643f1.appspot.com",
+  messagingSenderId: "96242533231",
+  appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ticketDiv = document.getElementById("ticketSalida");
+const lista = [];
+
+document.getElementById("buscarBtn").addEventListener("click", async () => {
+  const folio = document.getElementById("folioInput").value.trim().toUpperCase();
+  if (!folio) {
+    alert("Ingresa un folio válido.");
+    return;
+  }
+
+  const ref = collection(db, "almacenes", "almacen_cigarro", "salidas");
+  const q = query(ref, where("folio", "==", folio));
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    alert("No se encontraron productos con ese folio.");
+    return;
+  }
+
+  const registros = snapshot.docs.map(doc => doc.data());
+  const fecha = registros[0].fecha;
+  const sucursal = registros[0].sucursal;
+  const entregadoNombre = registros[0].entregado;
+
+  lista.length = 0; // limpiar lista
+  registros.forEach(item => {
+    lista.push({
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      cantidad: item.cantidad
+    });
+  });
+
+  generarTicket(folio, fecha, sucursal, entregadoNombre);
+});
+
+function generarTicket(folio, fecha, sucursal, entregadoNombre) {
+  const ticketHTML = (tipo) => `
+    <div style="text-align:center;">
+      <h4>${tipo}</h4>
+      <img src="logo_proveedora_bn.png" alt="Logo" width="120"><br>
+      <strong>SALIDA DE ALMACÉN CIGARRO</strong><br><br>
+    </div>
+    <p><strong>Folio:</strong> ${folio}</p>
+    <p><strong>Fecha:</strong> ${fecha}</p>
+    <p><strong>Sucursal destino:</strong> ${sucursal}</p>
+    <table style="width:100%; border-collapse:collapse;" border="1">
+      <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th></tr></thead>
+      <tbody>
+        ${lista.map(item => `<tr><td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.cantidad}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    <p><strong>Entregado por:</strong> ${entregadoNombre}</p>
+    <p><strong>Firma:</strong></p>
+    <p>________________________</p>
+    <br><br>
+    <p style="margin-top: 25px;"><strong>Recibido por (nombre):</strong></p>
+    <p>________________________</p>
+  `;
+
+  // Mostrar ORIGINAL
+  ticketDiv.innerHTML = ticketHTML("ORIGINAL");
+  ticketDiv.style.display = "block";
+
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      // Mostrar COPIA
+      ticketDiv.innerHTML = ticketHTML("COPIA");
+      setTimeout(() => {
+        window.print();
+      }, 800);
+    }, 1000);
+  }, 300);
+}
+</script>
+</body>
+</html>
