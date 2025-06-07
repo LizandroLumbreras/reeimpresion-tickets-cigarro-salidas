@@ -2,96 +2,140 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Ticket MiniPrinter</title>
+  <title>Reimpresión - Salidas Cigarro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: monospace;
-      font-size: 12px;
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    h2 { text-align: center; }
+    .grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 30px; }
+    .card {
       background: white;
-      margin: 0;
-      padding: 0;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 280px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
     }
-    .ticket {
-      width: 58mm;
-      max-width: 100%;
-      padding: 5px;
-      margin: auto;
-    }
-    .center {
-      text-align: center;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 2px;
-      text-align: left;
-      border-bottom: 1px dashed #000;
-    }
-    .logo {
-      width: 100px;
-      margin-bottom: 5px;
-    }
-    .line {
-      border-top: 1px dashed black;
-      margin: 5px 0;
-    }
+    .card:hover { transform: scale(1.03); background: #f0f0f0; }
+    .ticket { display: none; }
     @media print {
-      @page { margin: 0; }
-      body * { visibility: hidden; }
-      .ticket, .ticket * {
-        visibility: visible;
-      }
-      .ticket {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 58mm;
-        padding: 5px;
-      }
+      body * { visibility: hidden !important; }
+      .ticket, .ticket * { visibility: visible !important; }
+      .ticket { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; display: block !important; }
     }
   </style>
 </head>
 <body>
 
-<div class="ticket" id="ticketSalida">
-  <div class="center">
-    <img src="logo_proveedora_bn.png" alt="Logo" class="logo"><br>
-    <strong>SALIDA DE ALMACÉN</strong><br>
-    <small>Folio: SC-00007</small><br>
-    <small>Fecha: 7/6/2025, 12:38:02</small><br>
-    <small>Sucursal: CAVAZOS</small><br>
-  </div>
+<h2>Reimpresión de Salidas - Almacén Cigarro</h2>
 
-  <div class="line"></div>
+<div class="grid" id="gridSalidas"></div>
 
-  <table>
-    <thead>
-      <tr><th>Código</th><th>Cant</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>75001322</td><td>100</td></tr>
-      <tr><td>75046251</td><td>100</td></tr>
-      <tr><td>75086745</td><td>100</td></tr>
-      <tr><td>75072195</td><td>20</td></tr>
-      <tr><td>08346917</td><td>100</td></tr>
-    </tbody>
-  </table>
+<div id="ticketSalida" class="ticket"></div>
 
-  <div class="line"></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, orderBy, getDocs, limit, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  <p>Entregado por: Gibrán</p>
-  <p>Firma: __________________</p>
-  <p>Recibido: _______________</p>
-</div>
+const firebaseConfig = {
+  apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+  authDomain: "inventariopv-643f1.firebaseapp.com",
+  projectId: "inventariopv-643f1",
+  storageBucket: "inventariopv-643f1.appspot.com",
+  messagingSenderId: "96242533231",
+  appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+};
 
-<script>
-  window.onload = () => {
-    window.print();
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const grid = document.getElementById("gridSalidas");
+const ticketDiv = document.getElementById("ticketSalida");
+const lista = [];
+
+const ref = collection(db, "almacenes", "almacen_cigarro", "salidas");
+const q = query(ref, orderBy("fecha", "desc"), limit(100));
+const snapshot = await getDocs(q);
+
+const foliosMap = new Map();
+snapshot.forEach(doc => {
+  const data = doc.data();
+  if (!foliosMap.has(data.folio)) {
+    foliosMap.set(data.folio, { folio: data.folio, fecha: data.fecha, sucursal: data.sucursal, entregado: data.entregado });
   }
-</script>
+});
 
+foliosMap.forEach(({ folio, fecha, sucursal, entregado }) => {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <strong>Folio:</strong> ${folio}<br>
+    <strong>Fecha:</strong> ${fecha}<br>
+    <strong>Sucursal:</strong> ${sucursal}<br>
+    <strong>Entregado por:</strong> ${entregado}<br>
+    <small>Haz clic para reimprimir</small>
+  `;
+  card.addEventListener("click", () => reimprimir(folio));
+  grid.appendChild(card);
+});
+
+async function reimprimir(folio) {
+  const q = query(ref, where("folio", "==", folio));
+  const snapshot = await getDocs(q);
+  const registros = snapshot.docs.map(doc => doc.data());
+
+  if (!registros.length) return;
+
+  const fecha = registros[0].fecha;
+  const sucursal = registros[0].sucursal;
+  const entregadoNombre = registros[0].entregado;
+
+  lista.length = 0;
+  registros.forEach(item => {
+    lista.push({ codigo: item.codigo, descripcion: item.descripcion, cantidad: item.cantidad });
+  });
+
+  generarTicket(folio, fecha, sucursal, entregadoNombre);
+}
+
+function generarTicket(folio, fecha, sucursal, entregadoNombre) {
+  const ticketHTML = (tipo) => `
+    <div style="text-align:center;">
+      <h4>${tipo}</h4>
+      <img src="logo_proveedora_bn.png" alt="Logo" width="120"><br>
+      <strong>SALIDA DE ALMACÉN CIGARRO</strong><br><br>
+    </div>
+    <p><strong>Folio:</strong> ${folio}</p>
+    <p><strong>Fecha:</strong> ${fecha}</p>
+    <p><strong>Sucursal destino:</strong> ${sucursal}</p>
+    <table style="width:100%; border-collapse:collapse;" border="1">
+      <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th></tr></thead>
+      <tbody>
+        ${lista.map(item => `<tr><td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.cantidad}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    <p><strong>Entregado por:</strong> ${entregadoNombre}</p>
+    <p><strong>Firma:</strong></p>
+    <p>________________________</p>
+    <br><br>
+    <p style="margin-top: 25px;"><strong>Recibido por (nombre):</strong></p>
+    <p>________________________</p>
+  `;
+
+  ticketDiv.innerHTML = ticketHTML("ORIGINAL");
+  ticketDiv.style.display = "block";
+  ticketDiv.style.visibility = "visible";
+
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      ticketDiv.innerHTML = ticketHTML("COPIA");
+      setTimeout(() => {
+        window.print();
+      }, 800);
+    }, 1000);
+  }, 300);
+}
+</script>
 </body>
 </html>
