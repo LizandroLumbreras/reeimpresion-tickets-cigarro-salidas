@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,9 +21,9 @@
     .card:hover { transform: scale(1.03); background: #f0f0f0; }
     .ticket { display: none; }
     @media print {
-      body * { visibility: hidden; }
-      .ticket, .ticket * { visibility: visible; }
-      .ticket { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; }
+      body * { visibility: hidden !important; }
+      .ticket, .ticket * { visibility: visible !important; }
+      .ticket { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; display: block !important; }
     }
   </style>
 </head>
@@ -36,7 +37,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, orderBy, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, getDocs, limit, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
@@ -57,7 +58,6 @@ const ref = collection(db, "almacenes", "almacen_cigarro", "salidas");
 const q = query(ref, orderBy("fecha", "desc"), limit(100));
 const snapshot = await getDocs(q);
 
-// Agrupar por folio
 const foliosMap = new Map();
 snapshot.forEach(doc => {
   const data = doc.data();
@@ -66,7 +66,6 @@ snapshot.forEach(doc => {
   }
 });
 
-// Mostrar tarjetas
 foliosMap.forEach(({ folio, fecha, sucursal, entregado }) => {
   const card = document.createElement("div");
   card.className = "card";
@@ -126,12 +125,15 @@ function generarTicket(folio, fecha, sucursal, entregadoNombre) {
 
   ticketDiv.innerHTML = ticketHTML("ORIGINAL");
   ticketDiv.style.display = "block";
+  ticketDiv.style.visibility = "visible";
 
   setTimeout(() => {
     window.print();
     setTimeout(() => {
       ticketDiv.innerHTML = ticketHTML("COPIA");
-      setTimeout(() => window.print(), 800);
+      setTimeout(() => {
+        window.print();
+      }, 800);
     }, 1000);
   }, 300);
 }
