@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reimpresión - Salidas Cigarro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    h2 { text-align: center; }
+    .grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 30px; }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 280px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .card:hover { transform: scale(1.03); background: #f0f0f0; }
+    .ticket { display: none; }
+    @media print {
+      body * { visibility: hidden !important; }
+      .ticket, .ticket * { visibility: visible !important; }
+      .ticket { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+<h2>Reimpresión de Salidas - Almacén Cigarro</h2>
+
+<div class="grid" id="gridSalidas"></div>
+
+<div id="ticketSalida" class="ticket"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, orderBy, getDocs, limit, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+  authDomain: "inventariopv-643f1.firebaseapp.com",
+  projectId: "inventariopv-643f1",
+  storageBucket: "inventariopv-643f1.appspot.com",
+  messagingSenderId: "96242533231",
+  appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const grid = document.getElementById("gridSalidas");
+const ticketDiv = document.getElementById("ticketSalida");
+const lista = [];
+
+const ref = collection(db, "almacenes", "almacen_cigarro", "salidas");
+const q = query(ref, orderBy("fecha", "desc"), limit(100));
+const snapshot = await getDocs(q);
+
+const foliosMap = new Map();
+snapshot.forEach(doc => {
+  const data = doc.data();
+  if (!foliosMap.has(data.folio)) {
+    foliosMap.set(data.folio, { folio: data.folio, fecha: data.fecha, sucursal: data.sucursal, entregado: data.entregado });
+  }
+});
+
+foliosMap.forEach(({ folio, fecha, sucursal, entregado }) => {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <strong>Folio:</strong> ${folio}<br>
+    <strong>Fecha:</strong> ${fecha}<br>
+    <strong>Sucursal:</strong> ${sucursal}<br>
+    <strong>Entregado por:</strong> ${entregado}<br>
+    <small>Haz clic para reimprimir</small>
+  `;
+  card.addEventListener("click", () => reimprimir(folio));
+  grid.appendChild(card);
+});
+
+async function reimprimir(folio) {
+  const q = query(ref, where("folio", "==", folio));
+  const snapshot = await getDocs(q);
+  const registros = snapshot.docs.map(doc => doc.data());
+
+  if (!registros.length) return;
+
+  const fecha = registros[0].fecha;
+  const sucursal = registros[0].sucursal;
+  const entregadoNombre = registros[0].entregado;
+
+  lista.length = 0;
+  registros.forEach(item => {
+    lista.push({ codigo: item.codigo, descripcion: item.descripcion, cantidad: item.cantidad });
+  });
+
+  generarTicket(folio, fecha, sucursal, entregadoNombre);
+}
+
+function generarTicket(folio, fecha, sucursal, entregadoNombre) {
+  const ticketHTML = (tipo) => `
+    <div style="text-align:center;">
+      <h4>${tipo}</h4>
+      <img src="logo_proveedora_bn.png" alt="Logo" width="120"><br>
+      <strong>SALIDA DE ALMACÉN CIGARRO</strong><br><br>
+    </div>
+    <p><strong>Folio:</strong> ${folio}</p>
+    <p><strong>Fecha:</strong> ${fecha}</p>
+    <p><strong>Sucursal destino:</strong> ${sucursal}</p>
+    <table style="width:100%; border-collapse:collapse;" border="1">
+      <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th></tr></thead>
+      <tbody>
+        ${lista.map(item => `<tr><td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.cantidad}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    <p><strong>Entregado por:</strong> ${entregadoNombre}</p>
+    <p><strong>Firma:</strong></p>
+    <p>________________________</p>
+    <br><br>
+    <p style="margin-top: 25px;"><strong>Recibido por (nombre):</strong></p>
+    <p>________________________</p>
+  `;
+
+  ticketDiv.innerHTML = ticketHTML("ORIGINAL");
+  ticketDiv.style.display = "block";
+  ticketDiv.style.visibility = "visible";
+
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      ticketDiv.innerHTML = ticketHTML("COPIA");
+      setTimeout(() => {
+        window.print();
+      }, 800);
+    }, 1000);
+  }, 300);
+}
+</script>
+</body>
+</html>
