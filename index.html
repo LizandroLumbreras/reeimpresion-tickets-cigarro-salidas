@@ -54,7 +54,7 @@ const ticketDiv = document.getElementById("ticketSalida");
 const lista = [];
 
 const ref = collection(db, "almacenes", "almacen_cigarro", "salidas");
-const q = query(ref, orderBy("fecha", "desc"), limit(100));
+const q = query(ref, orderBy("folio", "desc"), limit(100));
 const snapshot = await getDocs(q);
 
 const foliosMap = new Map();
